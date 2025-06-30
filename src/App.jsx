@@ -1,35 +1,51 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useState } from 'react';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [archivos, setArchivos] = useState([]);
+  const [urlPdfUnido, setUrlPdfUnido] = useState(null);
+
+  const manejarSeleccion = (e) => {
+    setArchivos(e.target.files);
+  };
+
+  const enviarArchivos = async () => {
+    const formData = new FormData();
+    for (let archivo of archivos) {
+      formData.append("files", archivo);
+    }
+
+    try {
+      const respuesta = await fetch("https://pidief-ab93.onrender.com/unir-pdf/", {
+        method: "POST",
+        body: formData,
+      });
+
+      const blob = await respuesta.blob();
+      const url = URL.createObjectURL(blob);
+      setUrlPdfUnido(url);
+    } catch (error) {
+      alert("Error al unir PDFs: " + error.message);
+    }
+  };
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <div style={{ padding: "2rem" }}>
+      <h1>Pidief 🧩</h1>
+      <p>Selecciona varios archivos PDF para unirlos:</p>
+
+      <input type="file" accept="application/pdf" multiple onChange={manejarSeleccion} />
+      <button onClick={enviarArchivos} style={{ marginTop: "1rem" }}>
+        Unir PDFs
+      </button>
+
+      {urlPdfUnido && (
+        <div style={{ marginTop: "1.5rem" }}>
+          <p>Tu PDF unido está listo:</p>
+          <a href={urlPdfUnido} download="pidief-unido.pdf">📥 Descargar PDF</a>
+        </div>
+      )}
+    </div>
+  );
 }
 
-export default App
+export default App;
