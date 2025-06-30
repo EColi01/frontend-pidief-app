@@ -15,7 +15,7 @@ function App() {
     }
 
     try {
-      const respuesta = await fetch("https://pidief-ab93.onrender.com/unir-pdf/", {
+      const respuesta = await fetch("https://pidief-ab93.onrender.com/", {
         method: "POST",
         body: formData,
       });
