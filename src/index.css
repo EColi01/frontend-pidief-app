@@ -1,4 +1,4 @@
-@tailwind base;
+@tailwind/postcss base;
 @tailwind components;
 @tailwind utilities;
 
