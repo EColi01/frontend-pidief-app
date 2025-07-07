@@ -1,9 +1,14 @@
-function App() {
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom"
+import Home from "./pages/Home"
+import UnirPDF from "./pages/UnirPDF"
+
+export default function App() {
   return (
-    <div className="bg-red-500 text-white p-10 text-3xl">
-      Tailwind funciona 🎉
-    </div>
+    <Router>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/unir" element={<UnirPDF />} />
+      </Routes>
+    </Router>
   )
 }
-
-export default App
