@@ -1,114 +1,136 @@
-import { useState } from "react";
-import { DndContext, closestCenter } from "@dnd-kit/core";
-import {
-  arrayMove,
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
+// src/pages/UnirPDF.jsx
+
+import React, { useState, useRef } from "react";
+import { PDFDocument } from "pdf-lib";
+import { useDroppable, useDraggable, DndContext, closestCenter, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { v4 as uuidv4 } from "uuid";
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
+import workerSrc from "pdfjs-dist/build/pdf.worker?url";
 
-function SortableItem({ id, file }) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
-  const [renderedCanvas, setRenderedCanvas] = useState(null);
+import "../styles/UnirPDF.css";
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    cursor: "grab",
-  };
+// Configurar el worker localmente
+GlobalWorkerOptions.workerSrc = workerSrc;
 
-  // Render PDF preview on load
-  useState(() => {
+const PDFPreview = ({ file, index }) => {
+  const [previewUrl, setPreviewUrl] = useState(null);
+
+  React.useEffect(() => {
     const renderPreview = async () => {
-      const pdf = await pdfjsLib.getDocument(URL.createObjectURL(file)).promise;
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await getDocument({ data: arrayBuffer }).promise;
       const page = await pdf.getPage(1);
-      const viewport = page.getViewport({ scale: 0.5 });
+      const viewport = page.getViewport({ scale: 1 });
       const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
       canvas.width = viewport.width;
       canvas.height = viewport.height;
-      const context = canvas.getContext("2d");
 
       await page.render({ canvasContext: context, viewport }).promise;
-      setRenderedCanvas(canvas.toDataURL());
+      setPreviewUrl(canvas.toDataURL());
     };
 
     renderPreview();
-  }, []);
+  }, [file]);
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className="border p-2 rounded bg-white shadow"
-    >
-      {renderedCanvas ? (
-        <img src={renderedCanvas} alt="Preview" className="w-full h-auto" />
+    <div className="preview">
+      {previewUrl ? (
+        <img src={previewUrl} alt={`Vista previa ${index + 1}`} />
       ) : (
-        <p>Cargando vista previa...</p>
+        <div className="loading">Cargando...</div>
       )}
-      <p className="text-sm mt-2 break-words">{file.name}</p>
     </div>
   );
-}
+};
+
+const SortableItem = ({ file, id, index }) => {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <PDFPreview file={file} index={index} />
+    </div>
+  );
+};
 
 export default function UnirPDF() {
-  const [files, setFiles] = useState([]);
+  const [pdfFiles, setPdfFiles] = useState([]);
+  const inputRef = useRef(null);
 
-  const handleFileChange = (e) => {
-    const selected = Array.from(e.target.files).map((file) => ({
-      id: uuidv4(),
-      file,
-    }));
-    setFiles((prev) => [...prev, ...selected]);
+  const handleFilesChange = (e) => {
+    const files = Array.from(e.target.files);
+    const filesWithId = files.map((file) => ({ id: uuidv4(), file }));
+    setPdfFiles((prev) => [...prev, ...filesWithId]);
   };
 
-  const handleDragEnd = ({ active, over }) => {
-    if (active.id !== over?.id) {
-      const oldIndex = files.findIndex((f) => f.id === active.id);
-      const newIndex = files.findIndex((f) => f.id === over.id);
-      setFiles((items) => arrayMove(items, oldIndex, newIndex));
-    }
-  };
-
-  const handleEnviar = async () => {
+  const handleDownload = async () => {
     const formData = new FormData();
-    files.forEach(({ file }) => formData.append("files", file));
+    pdfFiles.forEach(({ file }) => formData.append("files", file));
 
-    const res = await fetch("https://pidief-ab93.onrender.com/unir-pdf/", {
+    const response = await fetch("https://backend-pidief-app.onrender.com/unir-pdf/", {
       method: "POST",
       body: formData,
     });
 
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "unido.pdf";
-    link.click();
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "unido.pdf";
+    a.click();
+    window.URL.revokeObjectURL(url);
   };
 
+  const sensors = useSensors(useSensor(PointerSensor));
+
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
-      <input type="file" multiple accept="application/pdf" onChange={handleFileChange} />
-      <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={files.map((f) => f.id)} strategy={verticalListSortingStrategy}>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-4">
-            {files.map(({ id, file }) => (
-              <SortableItem key={id} id={id} file={file} />
-            ))}
-          </div>
-        </SortableContext>
-      </DndContext>
-      {files.length > 0 && (
-        <button onClick={handleEnviar} className="mt-6 bg-blue-600 text-white px-4 py-2 rounded">
-          Unir PDFs
-        </button>
+    <div className="unir-pdf-container">
+      <input
+        type="file"
+        accept="application/pdf"
+        multiple
+        ref={inputRef}
+        onChange={handleFilesChange}
+        style={{ display: "none" }}
+      />
+      <button className="upload-button" onClick={() => inputRef.current.click()}>
+        Seleccionar PDFs
+      </button>
+
+      {pdfFiles.length > 0 && (
+        <>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={(event) => {
+              const { active, over } = event;
+              if (active.id !== over.id) {
+                const oldIndex = pdfFiles.findIndex((f) => f.id === active.id);
+                const newIndex = pdfFiles.findIndex((f) => f.id === over.id);
+                setPdfFiles(arrayMove(pdfFiles, oldIndex, newIndex));
+              }
+            }}
+          >
+            <SortableContext items={pdfFiles.map((f) => f.id)} strategy={verticalListSortingStrategy}>
+              <div className="previews-container">
+                {pdfFiles.map(({ file, id }, index) => (
+                  <SortableItem key={id} id={id} file={file} index={index} />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+
+          <button className="download-button" onClick={handleDownload}>
+            Descargar PDF unido
+          </button>
+        </>
       )}
     </div>
   );
