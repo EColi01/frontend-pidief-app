@@ -8,9 +8,11 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { v4 as uuidv4 } from "uuid";
-import { GlobalWorkerOptions, getDocument } from "pdfjs-dist";
+import * as pdfjsLib from "pdfjs-dist";
+import worker from "../pdf.worker.js";
 
-GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+pdfjsLib.GlobalWorkerOptions.workerPort = worker();
+
 
 function SortableItem({ id, file, preview }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
