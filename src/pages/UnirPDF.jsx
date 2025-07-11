@@ -1,32 +1,46 @@
-import { useState } from "react";
-import { DndContext, closestCenter } from "@dnd-kit/core";
+import { useState } from 'react';
+import { DndContext, closestCenter } from '@dnd-kit/core';
 import {
-  SortableContext,
-  verticalListSortingStrategy,
   arrayMove,
+  SortableContext,
   useSortable,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { v4 as uuidv4 } from "uuid";
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
-import "pdfjs-dist/legacy/build/pdf.worker";
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { v4 as uuidv4 } from 'uuid';
+import * as pdfjsLib from 'pdfjs-dist';
+import 'pdfjs-dist/legacy/build/pdf.worker.min.js';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-
-
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
 function SortableItem({ id, file, preview }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
-
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    cursor: "grab",
+    cursor: 'grab',
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="bg-white p-2 rounded shadow">
-      <img src={preview} alt="Vista previa PDF" className="w-full h-40 object-contain" />
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      style={style}
+      className="border p-2 rounded bg-white shadow"
+    >
+      <canvas
+        ref={(canvas) => {
+          if (canvas && preview) {
+            const context = canvas.getContext('2d');
+            const viewport = preview.getViewport({ scale: 1 });
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            preview.render({ canvasContext: context, viewport });
+          }
+        }}
+        className="w-full h-auto"
+      />
       <p className="text-sm mt-2 break-words">{file.name}</p>
     </div>
   );
@@ -34,34 +48,36 @@ function SortableItem({ id, file, preview }) {
 
 export default function UnirPDF() {
   const [files, setFiles] = useState([]);
+  const [previews, setPreviews] = useState({});
 
   const handleFileChange = async (e) => {
     const selectedFiles = Array.from(e.target.files);
+    const updatedFiles = [];
 
-    const newFiles = await Promise.all(
-      selectedFiles.map(async (file) => {
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await getDocument({ data: arrayBuffer }).promise;
-        const page = await pdf.getPage(1);
-        const viewport = page.getViewport({ scale: 1.5 });
+    for (const file of selectedFiles) {
+      const id = uuidv4();
+      const reader = new FileReader();
 
-        const canvas = document.createElement("canvas");
-        const context = canvas.getContext("2d");
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-
-        await page.render({ canvasContext: context, viewport }).promise;
-        const imageUrl = canvas.toDataURL();
-
-        return {
-          id: uuidv4(),
-          file,
-          preview: imageUrl,
+      const preview = await new Promise((resolve, reject) => {
+        reader.onload = async () => {
+          try {
+            const typedarray = new Uint8Array(reader.result);
+            const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
+            const page = await pdf.getPage(1);
+            resolve(page);
+          } catch (err) {
+            console.error('Error al cargar PDF:', err);
+            resolve(null);
+          }
         };
-      })
-    );
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(file);
+      });
 
-    setFiles((prev) => [...prev, ...newFiles]);
+      updatedFiles.push({ id, file, preview });
+    }
+
+    setFiles((prev) => [...prev, ...updatedFiles]);
   };
 
   const handleDragEnd = (event) => {
@@ -82,28 +98,28 @@ export default function UnirPDF() {
       body: formData,
     });
 
-    if (!res.ok) {
-      alert("Error al unir los archivos PDF");
-      return;
-    }
-
     const blob = await res.blob();
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
     link.download = "unido.pdf";
-    document.body.appendChild(link);
     link.click();
-    link.remove();
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-4">
-      <input type="file" multiple accept="application/pdf" onChange={handleFileChange} className="mb-4" />
+    <div className="max-w-5xl mx-auto p-4">
+      <h1 className="text-2xl font-semibold mb-4">Unir PDFs</h1>
+      <input
+        type="file"
+        multiple
+        accept="application/pdf"
+        onChange={handleFileChange}
+        className="mb-4"
+      />
 
       <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={files.map((f) => f.id)} strategy={verticalListSortingStrategy}>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {files.map((f) => (
               <SortableItem key={f.id} id={f.id} file={f.file} preview={f.preview} />
             ))}
@@ -114,7 +130,7 @@ export default function UnirPDF() {
       {files.length > 0 && (
         <button
           onClick={handleEnviar}
-          className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow"
+          className="mt-6 bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition"
         >
           Unir PDFs
         </button>
