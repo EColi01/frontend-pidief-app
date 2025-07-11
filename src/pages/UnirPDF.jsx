@@ -9,8 +9,7 @@ import { v4 as uuidv4 } from "uuid";
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import workerSrc from "pdfjs-dist/build/pdf.worker?url";
 
-import "../styles/UnirPDF.css";
-
+//import "../styles/UnirPDF.css";
 // Configurar el worker localmente
 GlobalWorkerOptions.workerSrc = workerSrc;
 
