@@ -9,10 +9,11 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { v4 as uuidv4 } from "uuid";
 
-// Configurar pdfjs-dist correctamente
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
-import pdfWorker from "pdfjs-dist/legacy/build/pdf.worker?worker";
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+
+// Usa CDN compatible con tu versión de pdfjs
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
 
 function SortableItem({ id, file, preview }) {
   const { attributes, listeners, setNodeRef, transform, transition } =
