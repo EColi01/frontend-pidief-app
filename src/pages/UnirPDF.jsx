@@ -1,4 +1,3 @@
-// src/pages/UnirPDF.jsx
 import { useState } from "react";
 import { DndContext, closestCenter } from "@dnd-kit/core";
 import {
@@ -9,10 +8,9 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { v4 as uuidv4 } from "uuid";
-import * as pdfjsLib from "pdfjs-dist";
-import "pdfjs-dist/build/pdf.worker.entry";
+import { GlobalWorkerOptions, getDocument } from "pdfjs-dist";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
 function SortableItem({ id, file, preview }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
@@ -40,7 +38,7 @@ export default function UnirPDF() {
     const newFiles = await Promise.all(
       selectedFiles.map(async (file) => {
         const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const pdf = await getDocument({ data: arrayBuffer }).promise;
         const page = await pdf.getPage(1);
         const viewport = page.getViewport({ scale: 1.5 });
 
