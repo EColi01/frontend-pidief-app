@@ -1,83 +1,95 @@
-import { useState } from 'react';
-import { DndContext, closestCenter } from '@dnd-kit/core';
+import { useEffect, useState } from "react";
+import { DndContext, closestCenter } from "@dnd-kit/core";
 import {
   arrayMove,
   SortableContext,
   useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { v4 as uuidv4 } from 'uuid';
-import * as pdfjsLib from 'pdfjs-dist';
-import 'pdfjs-dist/legacy/build/pdf.worker.min.js';
+  verticalListSortingStrategy
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { v4 as uuidv4 } from "uuid";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+// Configurar pdfjs-dist correctamente
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
+import pdfWorker from "pdfjs-dist/legacy/build/pdf.worker?worker";
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 function SortableItem({ id, file, preview }) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
+  const { attributes, listeners, setNodeRef, transform, transition } =
+    useSortable({ id });
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    cursor: 'grab',
+    cursor: "grab",
   };
 
   return (
     <div
       ref={setNodeRef}
+      style={style}
       {...attributes}
       {...listeners}
-      style={style}
-      className="border p-2 rounded bg-white shadow"
+      className="bg-white rounded shadow p-2 flex flex-col items-center"
     >
       <canvas
         ref={(canvas) => {
           if (canvas && preview) {
-            const context = canvas.getContext('2d');
-            const viewport = preview.getViewport({ scale: 1 });
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
-            preview.render({ canvasContext: context, viewport });
+            const ctx = canvas.getContext("2d");
+            const { width, height, data } = preview;
+            canvas.width = width;
+            canvas.height = height;
+            const imgData = ctx.createImageData(width, height);
+            imgData.data.set(data);
+            ctx.putImageData(imgData, 0, 0);
           }
         }}
-        className="w-full h-auto"
+        className="w-full h-40 object-contain"
       />
-      <p className="text-sm mt-2 break-words">{file.name}</p>
+      <p className="text-sm mt-2 text-center break-words">{file.name}</p>
     </div>
   );
 }
 
 export default function UnirPDF() {
   const [files, setFiles] = useState([]);
-  const [previews, setPreviews] = useState({});
 
   const handleFileChange = async (e) => {
     const selectedFiles = Array.from(e.target.files);
-    const updatedFiles = [];
 
-    for (const file of selectedFiles) {
-      const id = uuidv4();
-      const reader = new FileReader();
+    const filePreviews = await Promise.all(
+      selectedFiles.map(async (file) => {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const page = await pdf.getPage(1);
 
-      const preview = await new Promise((resolve, reject) => {
-        reader.onload = async () => {
-          try {
-            const typedarray = new Uint8Array(reader.result);
-            const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
-            const page = await pdf.getPage(1);
-            resolve(page);
-          } catch (err) {
-            console.error('Error al cargar PDF:', err);
-            resolve(null);
-          }
+        const viewport = page.getViewport({ scale: 0.5 });
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+
+        await page.render({
+          canvasContext: context,
+          viewport,
+        }).promise;
+
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+
+        return {
+          id: uuidv4(),
+          file,
+          preview: {
+            width: canvas.width,
+            height: canvas.height,
+            data: imageData.data,
+          },
         };
-        reader.onerror = reject;
-        reader.readAsArrayBuffer(file);
-      });
+      })
+    );
 
-      updatedFiles.push({ id, file, preview });
-    }
-
-    setFiles((prev) => [...prev, ...updatedFiles]);
+    setFiles((prev) => [...prev, ...filePreviews]);
   };
 
   const handleDragEnd = (event) => {
@@ -91,12 +103,17 @@ export default function UnirPDF() {
 
   const handleEnviar = async () => {
     const formData = new FormData();
-    files.forEach((f) => formData.append("files", f.file));
+    files.forEach((f) => formData.append("files", f.file)); // 👈 asegúrate que sea "files"
 
     const res = await fetch("https://pidief-ab93.onrender.com/unir-pdf/", {
       method: "POST",
       body: formData,
     });
+
+    if (!res.ok) {
+      alert("Error al unir los archivos");
+      return;
+    }
 
     const blob = await res.blob();
     const url = window.URL.createObjectURL(blob);
@@ -108,13 +125,16 @@ export default function UnirPDF() {
 
   return (
     <div className="max-w-5xl mx-auto p-4">
-      <h1 className="text-2xl font-semibold mb-4">Unir PDFs</h1>
+      <h2 className="text-2xl font-bold mb-4 text-center text-blue-600">
+        Unir Archivos PDF
+      </h2>
+
       <input
         type="file"
-        multiple
         accept="application/pdf"
+        multiple
         onChange={handleFileChange}
-        className="mb-4"
+        className="mb-6 block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
       />
 
       <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -128,12 +148,14 @@ export default function UnirPDF() {
       </DndContext>
 
       {files.length > 0 && (
-        <button
-          onClick={handleEnviar}
-          className="mt-6 bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition"
-        >
-          Unir PDFs
-        </button>
+        <div className="text-center mt-6">
+          <button
+            onClick={handleEnviar}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-full transition"
+          >
+            Unir PDFs
+          </button>
+        </div>
       )}
     </div>
   );
