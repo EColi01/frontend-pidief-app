@@ -8,10 +8,11 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { v4 as uuidv4 } from "uuid";
-import * as pdfjsLib from "pdfjs-dist";
-import worker from "../pdf.worker.js";
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
+import "pdfjs-dist/legacy/build/pdf.worker";
 
-pdfjsLib.GlobalWorkerOptions.workerPort = worker();
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
 
 
 function SortableItem({ id, file, preview }) {
@@ -115,7 +116,7 @@ export default function UnirPDF() {
           onClick={handleEnviar}
           className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow"
         >
-          Unir PDFs!
+          Unir PDFs
         </button>
       )}
     </div>
