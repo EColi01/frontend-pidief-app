@@ -6,7 +6,6 @@ import { CSS } from "@dnd-kit/utilities";
 import { v4 as uuidv4 } from "uuid";
 import workerSrc from "pdfjs-dist/build/pdf.worker?url";
 
-// Configurar el worker localmente
 GlobalWorkerOptions.workerSrc = workerSrc;
 
 const PDFPreview = ({ file, index }) => {
@@ -17,7 +16,7 @@ const PDFPreview = ({ file, index }) => {
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await getDocument({ data: arrayBuffer }).promise;
       const page = await pdf.getPage(1);
-      const viewport = page.getViewport({ scale: 1 });
+      const viewport = page.getViewport({ scale: 0.7 }); // REDUCIR ESCALA
       const canvas = document.createElement("canvas");
       const context = canvas.getContext("2d");
       canvas.width = viewport.width;
@@ -31,12 +30,13 @@ const PDFPreview = ({ file, index }) => {
   }, [file]);
 
   return (
-    <div className="w-full max-w-sm border rounded shadow p-2 bg-white">
+    <div className="w-full max-w-xs border rounded shadow bg-white p-2 flex flex-col items-center justify-between">
       {previewUrl ? (
-        <img src={previewUrl} alt={`Vista previa ${index + 1}`} className="w-full h-auto" />
+        <img src={previewUrl} alt={`Vista previa ${index + 1}`} className="w-full h-auto mb-2" />
       ) : (
         <div className="text-center text-gray-500">Cargando...</div>
       )}
+      <p className="text-sm text-gray-700 truncate max-w-full text-center">{file.name}</p>
     </div>
   );
 };
@@ -86,8 +86,8 @@ export default function UnirPDF() {
   const sensors = useSensors(useSensor(PointerSensor));
 
   return (
-    <div className="min-h-screen px-4 py-8 bg-gray-50">
-      <div className="max-w-3xl mx-auto space-y-6">
+    <div className="min-h-screen px-4 py-8 bg-gradient-to-br from-[#f5f7fa] to-[#c3cfe2]">
+      <div className="max-w-4xl mx-auto space-y-6">
         <button
           className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded shadow"
           onClick={() => inputRef.current.click()}
@@ -118,7 +118,7 @@ export default function UnirPDF() {
               }}
             >
               <SortableContext items={pdfFiles.map((f) => f.id)} strategy={verticalListSortingStrategy}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                   {pdfFiles.map(({ file, id }, index) => (
                     <SortableItem key={id} id={id} file={file} index={index} />
                   ))}
