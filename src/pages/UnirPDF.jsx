@@ -73,7 +73,7 @@ export default function UnirPDF() {
     const formData = new FormData();
     pdfFiles.forEach(({ file }) => formData.append("files", file));
 
-    const response = await fetch("https://backend-pidief-app.onrender.com/unir-pdf/", {
+    const response = await fetch("https://backend-pidief-app.onrender.com/", {
       method: "POST",
       body: formData,
     });
