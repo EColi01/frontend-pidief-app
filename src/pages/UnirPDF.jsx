@@ -86,7 +86,7 @@ export default function UnirPDF() {
   const sensors = useSensors(useSensor(PointerSensor));
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen">
       <div className="max-w-4xl mx-auto space-y-6">
         <button
           className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded shadow"
