@@ -135,6 +135,8 @@ const SortableItem = ({ file, id, index, rotation, onDelete, onRotate }) => {
 
 export default function UnirPDF() {
   const [pdfFiles, setPdfFiles] = useState([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const inputRef = useRef(null);
 
   const handleFilesChange = (e) => {
@@ -144,32 +146,73 @@ export default function UnirPDF() {
   };
 
   const handleDownload = async () => {
-    const formData = new FormData();
-    
-    // Create a rotations object to map file index to rotation angle
-    const rotationsMap = {};
-    
-    // Add all files to formData
-    pdfFiles.forEach(({ file, rotation }, index) => {
-      formData.append("files", file);
-      rotationsMap[index] = rotation;
-    });
-    
-    // Add the rotations map as a JSON string
-    formData.append("rotations", JSON.stringify(rotationsMap));
+    try {
+      // Reset and start loading state
+      setIsProcessing(true);
+      setUploadProgress(0);
+      
+      const formData = new FormData();
+      
+      // Create a rotations object to map file index to rotation angle
+      const rotationsMap = {};
+      
+      // Add all files to formData
+      pdfFiles.forEach(({ file, rotation }, index) => {
+        formData.append("files", file);
+        rotationsMap[index] = rotation;
+      });
+      
+      // Add the rotations map as a JSON string
+      formData.append("rotations", JSON.stringify(rotationsMap));
 
-    const response = await fetch("https://pidief-ab93.onrender.com/unir-pdf/", {
-      method: "POST",
-      body: formData,
-    });
+      // Create a custom fetch with upload progress tracking
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "https://pidief-ab93.onrender.com/unir-pdf/", true);
+      
+      // Setup progress monitoring
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const progress = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(progress);
+        }
+      };
 
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "unido.pdf";
-    a.click();
-    window.URL.revokeObjectURL(url);
+      // Create a promise to handle the XHR request
+      const response = await new Promise((resolve, reject) => {
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(new Response(xhr.response, { 
+              status: xhr.status,
+              statusText: xhr.statusText
+            }));
+          } else {
+            reject(new Error('Error en la subida de archivos'));
+          }
+        };
+        xhr.onerror = () => reject(new Error('Error de red'));
+        xhr.onabort = () => reject(new Error('Subida cancelada'));
+        xhr.responseType = 'blob';
+        xhr.send(formData);
+      });
+
+      // Set upload completed but still processing
+      setUploadProgress(100);
+      
+      // Get the response blob
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "unido.pdf";
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error al procesar los PDFs:", error);
+      alert("Error al procesar los PDFs: " + error.message);
+    } finally {
+      // Reset loading state
+      setIsProcessing(false);
+    }
   };
 
   const handleDeleteFile = (id) => {
@@ -237,12 +280,38 @@ export default function UnirPDF() {
               </SortableContext>
             </DndContext>
 
-            <button
-              onClick={handleDownload}
-              className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded shadow"
-            >
-              Descargar PDF unido
-            </button>
+            {isProcessing ? (
+              <div className="bg-white rounded-lg p-4 shadow-md w-full">
+                <div className="flex flex-col items-center space-y-3">
+                  <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2">
+                    <div 
+                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" 
+                      style={{ width: `${uploadProgress}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-gray-700">
+                    {uploadProgress < 100 
+                      ? `Subiendo archivos: ${uploadProgress}%` 
+                      : "Procesando archivos... Por favor espere"}
+                  </p>
+                  <div className="flex items-center justify-center">
+                    <svg className="animate-spin h-5 w-5 text-blue-600 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span className="font-medium">Procesando...</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={handleDownload}
+                disabled={isProcessing}
+                className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded shadow"
+              >
+                Descargar PDF unido
+              </button>
+            )}
           </>
         )}
       </div>
