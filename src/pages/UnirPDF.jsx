@@ -10,38 +10,53 @@ GlobalWorkerOptions.workerSrc = workerSrc;
 
 const PDFPreview = ({ file, index, rotation, onDelete, onRotate }) => {
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [loadedFile, setLoadedFile] = useState(null);
 
+  // This effect handles the initial file loading and preview generation
   React.useEffect(() => {
     const renderPreview = async () => {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await getDocument({ data: arrayBuffer }).promise;
-      const page = await pdf.getPage(1);
-      const viewport = page.getViewport({ scale: 0.7 }); // REDUCIR ESCALA
-      const canvas = document.createElement("canvas");
-      const context = canvas.getContext("2d");
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await getDocument({ data: arrayBuffer }).promise;
+        const page = await pdf.getPage(1);
+        const viewport = page.getViewport({ scale: 0.7 }); // REDUCIR ESCALA
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
 
-      await page.render({ canvasContext: context, viewport }).promise;
-      setPreviewUrl(canvas.toDataURL());
+        await page.render({ canvasContext: context, viewport }).promise;
+        setPreviewUrl(canvas.toDataURL());
+        setLoadedFile(pdf);
+      } catch (error) {
+        console.error("Error rendering PDF preview:", error);
+      }
     };
 
     renderPreview();
-  }, [file]);
+  }, [file]); // Only re-render preview when file changes
 
   return (
     <div className="w-full max-w-xs border rounded shadow bg-white p-2 flex flex-col items-center justify-between relative">
       {previewUrl ? (
         <div className="w-full relative">
-          <img 
-            src={previewUrl} 
-            alt={`Vista previa ${index + 1}`} 
-            className="w-full h-auto mb-2" 
-            style={{ transform: `rotate(${rotation}deg)` }}
-          />
+          <div className="w-full flex justify-center items-center" style={{ 
+            transform: `rotate(${rotation}deg)`,
+            transition: "transform 0.3s ease-in-out",
+            minHeight: "200px"
+          }}>
+            <img 
+              src={previewUrl} 
+              alt={`Vista previa ${index + 1}`} 
+              className="w-full h-auto mb-2 object-contain"
+            />
+          </div>
           <div className="absolute right-0 top-0 flex flex-col space-y-2">
             <button 
-              onClick={onDelete} 
+              onClick={(e) => {
+                e.stopPropagation(); // Prevent triggering drag events
+                onDelete();
+              }} 
               className="bg-red-500 hover:bg-red-600 text-white p-2 rounded-full w-8 h-8 flex items-center justify-center shadow"
               title="Eliminar"
             >
@@ -50,7 +65,10 @@ const PDFPreview = ({ file, index, rotation, onDelete, onRotate }) => {
               </svg>
             </button>
             <button 
-              onClick={onRotate} 
+              onClick={(e) => {
+                e.stopPropagation(); // Prevent triggering drag events
+                onRotate();
+              }} 
               className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-full w-8 h-8 flex items-center justify-center shadow"
               title="Rotar 90°"
             >
@@ -101,11 +119,17 @@ export default function UnirPDF() {
   const handleDownload = async () => {
     const formData = new FormData();
     
-    // For each PDF file, we need to add both the file and its rotation information
-    pdfFiles.forEach(({ file, rotation }) => {
+    // Create a rotations object to map file index to rotation angle
+    const rotationsMap = {};
+    
+    // Add all files to formData
+    pdfFiles.forEach(({ file, rotation }, index) => {
       formData.append("files", file);
-      formData.append("rotations", rotation);
+      rotationsMap[index] = rotation;
     });
+    
+    // Add the rotations map as a JSON string
+    formData.append("rotations", JSON.stringify(rotationsMap));
 
     const response = await fetch("https://pidief-ab93.onrender.com/unir-pdf/", {
       method: "POST",
