@@ -265,7 +265,7 @@ export default function DividirPDF() {
 
       // Crear un XHR para monitorear el progreso
       const xhr = new XMLHttpRequest();
-      xhr.open("POST", "http://0.0.0.0:8001/dividir-pdf/", true);
+      xhr.open("POST", "https://pidief-ab93.onrender.com/dividir-pdf/", true);
       
       // Configurar seguimiento del progreso
       xhr.upload.onprogress = (event) => {
