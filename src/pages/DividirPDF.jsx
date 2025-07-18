@@ -248,14 +248,24 @@ export default function DividirPDF() {
         return;
       }
 
+      // Crear un objeto con las rotaciones de cada página
+      const rotations = {};
+      pdfPages.filter(page => page.selected).forEach(page => {
+        // Solo incluir páginas con rotación
+        if (page.rotation !== 0) {
+          rotations[page.pageNumber] = page.rotation;
+        }
+      });
+
       // Crear formData para el envío
       const formData = new FormData();
       formData.append("file", pdfFile);
       formData.append("selected_pages", JSON.stringify(selectedPages));
+      formData.append("rotations", JSON.stringify(rotations));
 
       // Crear un XHR para monitorear el progreso
       const xhr = new XMLHttpRequest();
-      xhr.open("POST", "https://pidief-ab93.onrender.com/dividir-pdf/", true);
+      xhr.open("POST", "http://0.0.0.0:8001/dividir-pdf/", true);
       
       // Configurar seguimiento del progreso
       xhr.upload.onprogress = (event) => {
